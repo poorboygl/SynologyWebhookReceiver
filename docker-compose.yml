@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  syno-webhook:
+    container_name: synology-webhook-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DOTNET_VERSION: 8        # thay 9 nếu project của bạn target net9.0
+        APP_DLL: SynologyWebhookReceiver.dll
+    image: synology-webhook:latest
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:9455
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "9455:9455"
+    networks:
+      - internal_network
+    # This tells docker to run with an unconfined seccomp profile (bypass host seccomp limitations)
+    security_opt:
+      - seccomp:unconfined
+
+networks:
+  internal_network:
+    driver: bridge
