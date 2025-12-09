@@ -11,24 +11,51 @@ List<WebSocket> _clients = new List<WebSocket>();
 app.UseWebSockets();
 app.Map("/ws", async context =>
 {
-    if (context.WebSockets.IsWebSocketRequest)
-    {
-        var ws = await context.WebSockets.AcceptWebSocketAsync();
-        _clients.Add(ws);
-        Console.WriteLine("Client Tekla connected.");
-
-        var buffer = new byte[2048];
-
-        while (ws.State == WebSocketState.Open)
-        {
-            await ws.ReceiveAsync(buffer, CancellationToken.None);
-        }
-
-        _clients.Remove(ws);
-    }
-    else
+    if (!context.WebSockets.IsWebSocketRequest)
     {
         context.Response.StatusCode = 400;
+        return;
+    }
+
+    var ws = await context.WebSockets.AcceptWebSocketAsync();
+    _clients.Add(ws);
+
+    Console.WriteLine("✔ Client Tekla connected.");
+
+    var buffer = new byte[2048];
+
+    try
+    {
+        while (ws.State == WebSocketState.Open)
+        {
+            var result = await ws.ReceiveAsync(buffer, CancellationToken.None);
+
+            // Client gửi frame Close?
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                Console.WriteLine("❌ Client Tekla requested close.");
+                break;
+            }
+        }
+    }
+    catch (WebSocketException ex)
+    {
+        Console.WriteLine("⚠ WebSocket disconnected unexpectedly: " + ex.Message);
+    }
+    finally
+    {
+        Console.WriteLine("❌ Removing client Tekla.");
+        _clients.Remove(ws);
+
+        try
+        {
+            await ws.CloseAsync(
+                WebSocketCloseStatus.NormalClosure,
+                "Closing",
+                CancellationToken.None
+            );
+        }
+        catch { }
     }
 });
 
